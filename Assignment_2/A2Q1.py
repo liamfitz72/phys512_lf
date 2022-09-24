@@ -54,8 +54,6 @@ def E_field_quad(z,R):
         E_i.append(R**2/2*integrate.quad(fun,-1,1)[0])
     return E_i
 
-
-
 R=1
 a=0
 b=2*R
@@ -95,5 +93,4 @@ plt.xlabel('z')
 plt.ylabel('E(z)')
 plt.legend(['Legendre integration z<0.99*R','Legendre integration z>1.01*R','scipy.integrate.quad'])
 plt.savefig('A2Q1_plot3.png')
-
 
