@@ -96,8 +96,8 @@ plt.savefig('A3Q2_plot2.png',bbox_inches='tight',dpi=200)
 plt.clf()
 t_f=1*10**6*year
 sol=integrate.solve_ivp(fun,(0,t_f),y0,method='Radau', max_step=t_f/20)
-plt.plot(sol['t'],sol['y'][4]/sol['y'][3])
-plt.xlabel('t (days)')
+plt.loglog(sol['t'],sol['y'][4]/sol['y'][3])
+plt.xlabel('t (years)')
 plt.legend(['Ratio Th-230 to U-234 over 1 million years'])
 plt.savefig('A3Q2_plot3.png',bbox_inches='tight',dpi=200)
 
