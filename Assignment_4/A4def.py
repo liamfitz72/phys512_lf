@@ -7,6 +7,7 @@ Created on Wed Oct 12 13:39:54 2022
 
 import numpy as np
 import matplotlib.pyplot as plt
+plt.rcParams['figure.dpi'] = 200
 
 # Part D) and E)
 
@@ -100,6 +101,10 @@ for i in range(num):
     
     plt.scatter(t,y-pred_rlz,s=1)  # Plot different realizations to compare
     plt.legend([i])
+    if i==0:
+        plt.savefig('A4_plot5.png')
+    if i==24:
+        plt.savefig('A4_plot6.png')
     plt.show()
     plt.cla()
 plt.clf()
