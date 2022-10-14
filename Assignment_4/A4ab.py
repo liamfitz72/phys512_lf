@@ -61,8 +61,8 @@ plt.clf()
 # Part B) #
 
 noise_est=np.mean(np.abs(y-pred))   # Noise estimate from residuals
-N=noise_est**(-2)*np.identity(len(m))  # Match shape of A.T@A, can put N to front of
-cov=np.linalg.inv(N@A.T@A)             # equation since N=const*identity (avoid memory error)
+N_inv=noise_est**(-2)*np.identity(len(m))  # Match shape of A.T@A, can put N to front of
+cov=np.linalg.inv(N_inv@A.T@A)             # equation since N=const*identity (avoid memory error)
 m_err=np.sqrt(np.diag(cov))
 
 print('Parameters are:''\na =',m[0],'+/-',m_err[0],
