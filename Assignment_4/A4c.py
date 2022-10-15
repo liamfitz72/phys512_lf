@@ -10,6 +10,12 @@ import matplotlib.pyplot as plt
 
 # Part C) #
 
+def chi_sq(y,m,t,noise_est): 
+    pred=calc_lorentz(m,t)[0]
+    diff=np.matrix(y-pred).T
+    chi_sq=1/noise_est**2*diff.T@diff  # Can pull N_inv out in front as a constant
+    return chi_sq
+
 def lorentz(m,t):
     return m[0]/(1+(t-m[1])**2/m[2]**2)
 
@@ -61,11 +67,13 @@ plt.legend(['Residuals of least squares fit \n(numerical differentiation)'])
 plt.savefig('A4_plot3.png')
 plt.clf()
 
-noise_est=np.mean(np.abs(y-pred))   # Noise estimate from residuals
+noise_est=np.std(y[:1000])  # Noise estimate from residuals
 N_inv=noise_est**(-2)*np.identity(len(m))  # Match shape of A.T@A, can put N to front of
-cov=np.linalg.inv(N_inv@A.T@A)             # equation since N=const*identity (avoid memory error)
-m_err=np.sqrt(np.diag(cov))
+cov=np.linalg.inv(N_inv@A.T@A)             # equation since N=const*identity (avoid memory 
+m_err=np.sqrt(np.diag(cov))                # error of large matrix)
 
 print('Parameters are:''\na =',m[0],'+/-',m_err[0],
       '\nt_0 =',m[1],'+/-',m_err[1],
-      '\nw =',m[2],'+/-',m_err[2])
+      '\nw =',m[2],'+/-',m_err[2],
+      '\nChi squared is:',
+      'Chi-sq = ',float(chi_sq(y,m,t,noise_est)))
