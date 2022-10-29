@@ -36,35 +36,6 @@ def get_spectrum(pars,lmax=3000):
     tt=cmb[:,0]    #you could return the full power spectrum here if you wanted to do say EE
     return tt[2:]
 
-def get_hessian(m,n_data):
-    l=len(m)
-    hess=np.empty([n_data,l,l])
-    m_c=m.copy()
-    for i in tqdm(range(l)):
-        for j in range(l):
-            dm_i=m[i]/100
-            dm_j=m[j]/100
-            if i==j:
-                y0=get_spectrum(m_c)
-                m_c[i]+=dm_i
-                y1=get_spectrum(m_c)
-                m_c[i]-=2*dm_i
-                y_1=get_spectrum(m_c)
-                hess[:,i,i]=(y1-2*y0+y_1)[:n_data]/dm_i**2
-            else:
-                m_c[i]+=dm_i
-                m_c[j]+=dm_j
-                y11=get_spectrum(m_c)
-                m_c[j]-=2*dm_j
-                y1_1=get_spectrum(m_c)
-                m_c[i]-=2*dm_i
-                m_c[j]+=2*dm_j
-                y_11=get_spectrum(m_c)
-                m_c[j]-=2*dm_j
-                y_1_1=get_spectrum(m_c)
-                hess[:,i,j]=(y11-y1_1-y_11+y_1_1)[:n_data]/(4*dm_i*dm_j)
-    return hess
-
 if __name__=="__main__":
     pars=np.asarray( [69,0.022,0.12,0.06,2.1e-9,0.95])
     planck=np.loadtxt('COM_PowerSpect_CMB-TT-full_R3.01.txt',skiprows=1)
@@ -83,17 +54,5 @@ if __name__=="__main__":
     plt.scatter(ell,model,s=1)
     plt.errorbar(planck_binned[:,0],planck_binned[:,1],errs_binned,fmt='.')
     plt.clf()
-    
-    #plot residuals to find interval without structure to calculate noise estimation
-    plt.scatter(ell,resid,s=1)
-    plt.legend(['Residuals'])
-    plt.savefig('A5_plot1.png',bbox_inches='tight')
-    plt.clf()
-    plt.scatter(ell[1400:1900],resid[1400:1900],s=1)
-    noise_est=np.std(resid[1400:1900])
-    plt.legend(['Residuals from 1400-1900'])
-    plt.savefig('A5_plot2.png',bbox_inches='tight')
-    print('noise estimate is:',noise_est)
-    print(get_hessian(pars,len(spec)))
     
     
