@@ -67,5 +67,3 @@ if __name__=="__main__":
     np.savetxt('planck_fit_params.txt',param_results, delimiter=',')
     np.savetxt('cov_matrix.txt',curv,delimiter=',')
     
-    
-    
