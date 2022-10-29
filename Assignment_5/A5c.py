@@ -66,11 +66,11 @@ if __name__=="__main__":
     errs=0.5*(planck[:,2]+planck[:,3])
     # planck_binned=np.loadtxt('COM_PowerSpect_CMB-TT-binned_R3.01.txt',skiprows=1)
     # errs_binned=0.5*(planck_binned[:,2]+planck_binned[:,3])
-    curv=np.loadtxt('inverse_hessian.txt',delimiter=',')
+    cov=np.loadtxt('cov_matrix.txt',delimiter=',')
       
     m0=np.loadtxt('planck_fit_params.txt',delimiter=',')[:,0]
     y_data=spec
-    chain,chisq=MCMC_chain(y_data,errs,m0,curv)
+    chain,chisq=MCMC_chain(y_data,errs,m0,cov)
     chain_data=np.hstack(chisq,chain)
     np.savetxt('planck_chain.txt',chain_data,delimiter=',')
     

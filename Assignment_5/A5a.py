@@ -55,15 +55,4 @@ if __name__=="__main__":
     plt.errorbar(planck_binned[:,0],planck_binned[:,1],errs_binned,fmt='.')
     plt.clf()
     
-    #plot residuals to find interval without structure to calculate noise estimation
-    plt.scatter(ell,resid,s=1)
-    plt.legend(['Residuals'])
-    plt.savefig('A5_plot1.png',bbox_inches='tight')
-    plt.clf()
-    plt.scatter(ell[1400:1900],resid[1400:1900],s=1)
-    noise_est=np.std(resid[1400:1900])
-    plt.legend(['Residuals from 1400-1900'])
-    plt.savefig('A5_plot2.png',bbox_inches='tight')
-    print('noise estimate is:',noise_est)
-    
     
