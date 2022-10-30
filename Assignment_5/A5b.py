@@ -17,26 +17,26 @@ def CMBmodel_param_grad(m,y_data):  # Get parameter gradient of model numericall
     n_m=len(m)
     A=np.empty([n_data,n_m])
     for i in range(n_m):
-        dm_i=m[i]/10**8  # Orders of magnitudes differences among parameters, set dx proportional
+        dm_i=m[i]/10**8  # Params have orders of magnitudes differences, set dx proportional
         m_c=m.copy()
         m_c[i]=m[i]+dm_i
         y2=get_spectrum(m_c)[:n_data]
         m_c[i]=m[i]-dm_i
         y1=get_spectrum(m_c)[:n_data]
         A[:,i]=(y2-y1)/(2*dm_i)  # Central difference
-    return A  # Transpose fits with Newton method function
+    return A
 
 def CMBmodel_newton_min(m0,y_data,errs,n):
     m=m0.copy()
     ndata=len(y_data)
-    N=np.diag(errs**2)
+    N=np.diag(errs**2)  # Errors no longer assumed constant, must include N
     N_inv=np.linalg.inv(N)
     for i in tqdm(range(n)):
         pred=get_spectrum(m)[:ndata]
-        grad=CMBmodel_param_grad(m,y_data)[:ndata]
+        A=CMBmodel_param_grad(m,y_data)[:ndata]
         resid=y_data-pred
-        lhs=grad.T@N_inv@grad
-        rhs=grad.T@N_inv@resid
+        lhs=A.T@N_inv@A
+        rhs=A.T@N_inv@resid
         cov=np.linalg.inv(lhs)
         dm=cov@rhs   # Newton method matrix equation from notes
         m=m+dm
@@ -66,4 +66,3 @@ if __name__=="__main__":
     param_results=np.matrix([m,m_err]).T
     np.savetxt('planck_fit_params.txt',param_results, delimiter=',')
     np.savetxt('cov_matrix.txt',curv,delimiter=',')
-    

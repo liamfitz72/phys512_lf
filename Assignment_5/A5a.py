@@ -52,7 +52,7 @@ if __name__=="__main__":
     planck_binned=np.loadtxt('COM_PowerSpect_CMB-TT-binned_R3.01.txt',skiprows=1)
     errs_binned=0.5*(planck_binned[:,2]+planck_binned[:,3]);
     plt.scatter(ell,model,s=1)
-    plt.errorbar(planck_binned[:,0],planck_binned[:,1],errs_binned,fmt='.')
+    plt.errorbar(ell[:,0],spec[:,1],errs,fmt='.')
     plt.clf()
     
     

@@ -23,7 +23,7 @@ def model_chisq(m,errs,y_data):
     resid=y_data-model[:len(y_data)]
     return np.sum((resid/errs)**2),resid
 
-def MCMC_chain(y_data,errs,m0,trial_step,nstep=10000,T=1):
+def MCMC_chain(y_data,errs,m0,trial_step,nstep=10000,scale=1,T=1):
     nparam=len(m0)
     chain=np.zeros([nstep,nparam])
     chisq=np.zeros(nstep)
@@ -32,7 +32,7 @@ def MCMC_chain(y_data,errs,m0,trial_step,nstep=10000,T=1):
     chisq[0]=cur_chisq
     m=m0
     for i in tqdm(range(1,nstep)):
-        dm=get_step(trial_step)
+        dm=scale*get_step(trial_step)
         trial_m=np.matrix(m+dm)
         new_chisq,resid=model_chisq(trial_m.T,errs,y_data)
         accept_prob=np.exp(-0.5*(new_chisq-cur_chisq)/T)
@@ -41,6 +41,8 @@ def MCMC_chain(y_data,errs,m0,trial_step,nstep=10000,T=1):
             cur_chisq,resid=(new_chisq,resid)
         chain[i,:]=np.ravel(m)
         chisq[i]=cur_chisq
+        print(cur_chisq)
+        print(m)
     return chain,chisq
 
 def chain_eval(chain,chisq,T=1):
