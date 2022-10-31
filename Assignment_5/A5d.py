@@ -39,6 +39,13 @@ if __name__=="__main__":
     tau_err=0.0074
     wt_fun=gaussian(chain[:,3],tau,tau_err)
     m,m_err=importance_sample(chain,wt_fun)
+    impsample=np.empty([len(m),2])
+    impsample[:,0]=m
+    impsample[:,1]=m_err
+    resid=spec-get_spectrum(m)[:len(spec)]
+    chi_sq=np.sum((resid/errs)**2)
+    print('Importance sampled chisq:',chi_sq)
+    np.savetxt('planck_params_impsample.txt',impsample,delimiter=',')
     
     A=CMBmodel_param_grad(m,spec)
     N_inv=np.linalg.inv(np.diag(errs**2))
@@ -54,6 +61,8 @@ if __name__=="__main__":
     chain_data[:,0]=chisq
     chain_data[:,1:]=chain
     np.savetxt('planck_chain_tauprior.txt',chain_data,delimiter=',')
+    
+
     
 # [6.76129133e+01 2.22717993e-02 1.19099062e-01 5.58662850e-02
 #  2.09997597e-09 9.69836774e-01]
