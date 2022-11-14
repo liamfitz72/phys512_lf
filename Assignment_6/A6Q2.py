@@ -18,15 +18,16 @@ def correlation(f,g):
 
 if __name__=="__main__":
     x=np.linspace(-5,5,1001)
-    y=gaussian(x)
+    y=gaussian(x,0,1)
     corr=correlation(y,y)
     plt.plot(x,corr)
     plt.legend(['Cross correlation of \nGaussian with itself'])
+    plt.savefig('A6Q2_plot1.png',bbox_inches='tight')
     plt.clf()
     
     y_shift=conv_shift(y,100)
-    shift_corr=correlation(y,y_shift)
+    shift_corr=correlation(y_shift,y_shift)
     plt.plot(x,corr)
     plt.plot(x,shift_corr)
     plt.legend(['Cross correlation from a)','Shifted Gaussian \ncorrelation'])
-
+    plt.savefig('A6Q2_plot2.png',bbox_inches='tight')
