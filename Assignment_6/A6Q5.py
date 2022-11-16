@@ -13,6 +13,7 @@ import scipy
 import json
 import h5py
 import sys
+from A6Q1 import convolve,gaussian
 from A6Q2 import correlation
 plt.rcParams['figure.dpi'] = 200
 
@@ -20,7 +21,28 @@ plt.rcParams['figure.dpi'] = 200
 data_dir="C:/Users/liamf/phys512_lf/Assignment_6/Data/"
 sys.path.append(data_dir)
 import readligo
-event_names=['GW150914','GW151226','LVT151012','GW170104']
+
+
+def get_powerspect(time,strain,win,smooth_width):
+    dt=time[1]-time[0]
+    freqs=np.fft.fftfreq(len(time),dt)
+    ps=np.abs(np.fft.fft(strain*win))**2
+    freqs=np.fft.fftshift(freqs)  # FFT shift to convolve and plot properly
+    ps=np.fft.fftshift(ps)
+    smooth_fun=gaussian(freqs,0,smooth_width)
+    ps_smooth=convolve(ps,smooth_fun/smooth_fun.sum())  # Normalize smooth_fun
+    return freqs,ps,ps_smooth
+
+def matched_filter(strain,win,template,noise_model):
+    data_ft=np.fft.fft(win*strain)
+    template_ft=np.fft.fft(win*template)
+    Ninv_ft=1/noise_model
+    rhs=np.fft.ifft(np.conj(template_ft)*Ninv_ft*data_ft)
+    return np.fft.fftshift(rhs)  # FFT shift after inverse
+
+def signal2noise(matched_filter,win,template,noise_model):
+    noise=np.sqrt(np.mean(matched_filter**2))  # Estimate noise as RMS of matched filter
+    return np.abs(matched_filter)/noise
 
 def read_template(data_dir,filename):
     dataFile=h5py.File(data_dir+filename,'r')
@@ -29,124 +51,149 @@ def read_template(data_dir,filename):
     tx=template[1]
     return tp,tx
 
-def read_events(data_dir,event_names):
-    json_file="BBH_events_v3.json"
-    events_json=json.load(open(data_dir+json_file,'r'))
-    data_dict={}
-    for event_name in event_names:
-        event=events_json[event_name]
-        fn_H1=event['fn_H1']
-        fn_L1=event['fn_L1']
-        # fband = event['fband']              
-        strain_Ha,time_Ha,chan_dict_Ha=readligo.loaddata(data_dir+fn_H1,'H1')
-        strain_Li,time_Li,chan_dict_Li=readligo.loaddata(data_dir+fn_L1,'L1')
-        time=time_Ha
-        template=read_template(data_dir,event['fn_template'])
-        
-        params={}
-        params['time']=time_Ha
-        params['dt']=time[1]-time[0]
-        params['strain_Ha']=strain_Ha
-        params['strain_Li']=strain_Li
-        params['fs']=event['fs']
-        params['tevent']=event['tevent']
-        params['template']=template
-        data_dict[event_name]=params
-    return data_dict
-
-def smooth(array,smooth_factor):
-    n=len(array)
-    x=np.arange(n)
-    x[n//2:]=x[n//2:]-n
-    sig=smooth_factor
-    krnl=np.exp(-0.5*(x/sig)**2)
-    krnl=krnl/krnl.sum()
-    array_ft=np.fft.fft(array)
-    krnl_ft=np.fft.fft(krnl)
-    array_smooth=np.fft.ifft(array_ft*krnl_ft)
-    return array_smooth
-
-def interp_Ninv_ft(psd,freqs_psd,freqs):
-    psd_interp=scipy.interpolate.interp1d(freqs_psd,psd)
-    Ninv_ft=1/psd_interp(freqs)
-    return Ninv_ft
-
-def matched_filter(strain,win,template,Ninv_ft):
-    data_ft=np.fft.fft(win*strain)
-    tp=template[0]
-    template_ft=np.fft.fft(win*tp)
-    rhs=np.fft.ifft(np.conj(template_ft)*Ninv_ft*data_ft)
-    return np.fft.fftshift(rhs)
-
-def signal2noise(matched_filter,template,Ninv_ft,df,win):
-    tp=template[0]
-    template_ft=np.fft.fft(win*tp)
-    sigmasq=(template_ft*Ninv_ft*np.conj(template_ft)).sum()*df
-    sigma=np.sqrt(np.abs(sigmasq))
-    return np.abs(matched_filter)/sigma
-
-def search_allevents(data_dict,event_names):
+def search_allevents(json_fname,event_names):
+    events=json.load(open(data_dir+json_fname,'r'))
+    times={}
+    ps={}
+    ps_smooth={}
     matched_filters={}
     signals2noise={}
+    templates={}
     for event_name in event_names:
-        params=data_dict[event_name]
-        time,dt,strain_Ha,strain_Li,fs,tevent,template=params.values()
-        win=scipy.signal.tukey(len(time))
+        event=events[event_name]   # First we have to read from JSON file
+        fn_H1=event['fn_H1']
+        fn_L1=event['fn_L1']
+        tevent=event['tevent']
+        strain_Ha,time_Ha,chan_dict_Ha=readligo.loaddata(data_dir+fn_H1,'H1')
+        strain_Li,time_Li,chan_dict_Li=readligo.loaddata(data_dir+fn_L1,'L1')
+        time=time_Ha-tevent
+        template=read_template(data_dir,event['fn_template'])[0]
+        win=scipy.signal.tukey(len(time),0.1)
         
-        psd_Ha,freqs_psd=mlab.psd(strain_Ha,Fs=fs,NFFT=4*fs,sides='twosided')
-        freqs=np.fft.fftfreq(len(time),dt)
-        freqs_psd[-1]=freqs.max()
+        # Get noise model, then matched filter, then signal to noise
+        freqs,ps_Ha,ps_smooth_Ha=get_powerspect(time,strain_Ha,win,2)
+        noise_model_Ha=np.fft.fftshift(ps_smooth_Ha)
+        matched_filter_Ha=matched_filter(strain_Ha,win,template,noise_model_Ha)
         df=np.abs(freqs[1]-freqs[0])
-        Ninv_ft=interp_Ninv_ft(psd_Ha,freqs_psd,freqs)
-        matched_filter_Ha=matched_filter(strain_Ha,win,template,Ninv_ft)
-        signal2noise_Ha=signal2noise(matched_filter_Ha,template,Ninv_ft,df,win)
+        signal2noise_Ha=signal2noise(matched_filter_Ha,win,template,noise_model_Ha)
         
-        psd_Li,freqs_psd=mlab.psd(strain_Li,Fs=fs,NFFT=4*fs,sides='twosided')
-        freqs=np.fft.fftfreq(len(time),dt)
-        freqs_psd[-1]=freqs.max()
-        df=np.abs(freqs[1]-freqs[0])
-        Ninv_ft=interp_Ninv_ft(psd_Li,freqs_psd,freqs)
-        matched_filter_Li=matched_filter(strain_Li,win,template,Ninv_ft)
-        signal2noise_Li=signal2noise(matched_filter_Li,template,Ninv_ft,df,win)
-        
+        freqs,ps_Li,ps_smooth_Li=get_powerspect(time,strain_Li,win,2)
+        noise_model_Li=np.fft.fftshift(ps_smooth_Li)
+        matched_filter_Li=matched_filter(strain_Li,win,template,noise_model_Li)
+        signal2noise_Li=signal2noise(matched_filter_Li,win,template,noise_model_Li)
+
+        times[event_name]=time
+        ps[event_name]=ps_Ha,ps_Li
+        ps_smooth[event_name]=ps_smooth_Ha,ps_smooth_Li
         matched_filters[event_name]=matched_filter_Ha,matched_filter_Li
         signals2noise[event_name]=signal2noise_Ha,signal2noise_Li
-    return matched_filters,signals2noise
+        templates[event_name]=template
+    return times,freqs,ps,ps_smooth,matched_filters,signals2noise,templates
 
-def plot_ASD(params,event_name,save=True):
-    time,dt,strain_Ha,strain_Li,fs,tevent,template=params.values()
-    psd_Ha,freqs_psd=mlab.psd(strain_Ha,Fs=fs,NFFT=4*fs)
-    psd_Li,freqs_psd=mlab.psd(strain_Li,Fs=fs,NFFT=4*fs)
-    plt.loglog(freqs_psd,np.sqrt(psd_Ha))
-    plt.loglog(freqs_psd,np.sqrt(psd_Li))
-    plt.xlabel('Freq. (Hz)')
-    plt.xlim([20,2000])
-    plt.ylabel('ASD (strain/rt(Hz))')
-    plt.ylim([10**(-25),10**(-19)])
-    plt.legend(['H1','L1'])
-    plt.title('ASD of '+event_name+' Event from both H1 and L1 detectors',fontsize=10)
-    plt.grid(which='both',linestyle=':',linewidth=0.6,color='k')
-    
+def sig2noise_analytic(matched_filter,template,noise_model):
+    Ninv_ft=1/noise_model
+    Ninv=np.fft.fftshift(np.fft.ifft(Ninv_ft))
+    noise=template.T@(Ninv*template)
+    return np.abs(matched_filter/noise)
 
-        
-    
-
-data_dict=read_events(data_dir,event_names)
-matched_filters,signals2noise=search_allevents(data_dict,event_names)
+json_fname="BBH_events_v3.json"
+event_names=['GW150914','GW151226','LVT151012','GW170104']
+times,freqs,ps,ps_smooth,matched_filters,signals2noise,templates=search_allevents(json_fname,event_names)
 
 event_name='GW150914'
-time=data_dict[event_name]['time']
-dt=data_dict[event_name]['dt']
-N=len(time)
-freq=np.fft.fftfreq(N,dt)
-strain_Ha=data_dict[event_name]['strain_Ha']
-strain_Ha_ft=np.fft.fft(strain_Ha)
-ps=np.abs(strain_Ha_ft)**2
-plt.plot(freq[:N//2],ps[:N//2])
+plt.loglog(freqs,ps[event_name][0])
+plt.loglog(freqs,ps_smooth[event_name][0])
+plt.xlim([20,2000])
+plt.xlabel('Frequency (Hz)')
+plt.ylim([10**(-43),10**(-28)])
+plt.legend(['Hartsford detector power spectrum','Smoothed power spectrum'])
+plt.savefig('A6Q5_plot1.png',bbox_inches='tight')
+plt.clf()
 
+plt.loglog(freqs,ps[event_name][1])
+plt.loglog(freqs,ps_smooth[event_name][1])
+plt.xlim([20,2000])
+plt.xlabel('Frequency (Hz)')
+plt.ylim([10**(-43),10**(-28)])
+plt.legend(['Livingston detector power spectrum','Smoothed power spectrum'])
+plt.savefig('A6Q5_plot2.png',bbox_inches='tight')
+plt.clf()
+
+plt.plot(times[event_name],matched_filters[event_name][0])
+plt.xlabel('Time since event (s)')
+plt.savefig('A6Q5_plot3.png',bbox_inches='tight')
+plt.clf()
+
+plt.plot(times[event_name],signals2noise[event_name][0])
+plt.xlabel('Time since event (s)')
+plt.savefig('A6Q5_plot4.png',bbox_inches='tight')
+plt.clf()
+
+for event_name in event_names:
+    plt.plot(times[event_name],signals2noise[event_name][0])
+    plt.plot(times[event_name],signals2noise[event_name][1])
+    plt.xlim([-1,1])
+    plt.legend(['Hanford detector','Livingston detector'])
+    plt.xlabel('Time since event (s)')
+    plt.title('Event '+event_name)
+    plt.savefig('A6Q5_mf_'+event_name+'.png',bbox_inches='tight')
+    plt.clf()
+
+
+# s2na=sig2noise_analytic(matched_filters[event_name][0],templates[event_name],ps_smooth[event_name][0])
+# plt.plot(times[event_name],s2na)
+
+dts=[]
+for event_name in event_names:
+    time=times[event_name]
+    i=np.argmax(signals2noise[event_name][0])
+    j=np.argmax(signals2noise[event_name][1])
+    dt=np.abs(time[i]-time[j])
+    dts.append(dt)
+dts=np.array(dts)
+    
+print(dts)
+print(dts*3*10**8/1000)
+
+
+
+
+
+
+
+
+# plt.plot(time-tevent,template)
+# plt.xlim([-3,3])
+# N=len(time)
+
+# time_new=(time-tevent)
+# i=np.argmin(np.abs(time_new))
+# time_new=time_new[i-10000:i+10000]
+# strain_Ha=strain_Ha[i-10000:i+10000]
+
+# plt.plot(time_new,strain_Ha)
+# win=scipy.signal.tukey(len(time_new),0.1)
+# plt.plot(time_new,strain_Ha*win)
+# plt.clf()
+
+# freq=np.fft.fftfreq(len(time_new),dt)
+# ps=np.abs(np.fft.fft(strain_Ha*win))**2
+# freq=np.fft.fftshift(freq)
+# ps=np.fft.fftshift(ps)
+
+# plt.loglog(freq,ps)
+# plt.xlim([20,2000])
+
+# M=10
+# smooth_fun=gaussian(freq,0,2)
+# ps_smooth=convolve(ps,smooth_fun/smooth_fun.sum())
+# plt.loglog(freq,ps_smooth)
+
+# plt.clf()
 # sig2noise_Ha=signals2noise[event_name][0]
 # matched_filter_Ha=matched_filters[event_name][0]
 # plt.plot(time,sig2noise_Ha)
+
 # plt.clf()
 # plot_ASD(data_dict[event_name],event_name)
 
