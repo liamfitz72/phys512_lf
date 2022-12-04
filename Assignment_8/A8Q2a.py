@@ -11,36 +11,31 @@ from tqdm import tqdm
 import scipy
 plt.rcParams['figure.dpi']=200
 
-def relax_iterate(rho,niter,plot=False):
-    n=len(rho[:,0])
-    V=np.zeros([n,n])
-    for i in tqdm(range(niter)):
-        Vavg=1/4*(np.roll(V,1,0)+np.roll(V,-1,0)+np.roll(V,1,1)+np.roll(V,-1,1))
-        Vnew=rho+Vavg
-        V=Vnew
-        V=V+(1-V.max())  # offset potential to keep V[0,0]=1
-        if i%10==0:
-            plt.clf()
-            plt.imshow(np.fft.fftshift(V),cmap='Reds')  # fftshift to plot negative indices
-            plt.colorbar()
-            plt.title('Iteration '+str(i)+'/'+str(niter))
-            plt.pause(0.2)
-    return V
-
-n=201
+n=100
+V=np.zeros([n,n])
 rho=np.zeros([n,n])
 rho[0,0]=1
-niter=(n-1)*20
+niter=n*20
 
-fig1=plt.figure(1)
-V=relax_iterate(rho,niter,True)
+for i in tqdm(range(niter)):
+    Vavg=1/4*(np.roll(V,1,0)+np.roll(V,-1,0)+np.roll(V,1,1)+np.roll(V,-1,1))
+    Vnew=rho+Vavg
+    V=Vnew
+    V=V+(1-V.max())  # offset potential to keep V[0,0]=1
+    if i%10==0:
+        plt.clf()
+        plt.imshow(np.fft.fftshift(V))  # fftshift to plot negative indices
+        plt.colorbar()
+        plt.pause(0.01)
 
 print('After '+str(niter)+' iterations',
       '\nV[1,0] =',V[1,0],
       '\nV[2,0] =',V[2,0],
       '\nV[5,0] =',V[5,0])
 
-plt.savefig('A8Q2_plot1.png',bbox_inches='tight')
+plt.imshow(np.fft.fftshift(V))
+plt.colorbar()
+plt.savefig('A8Q2a_Vrelax.png',bbox_inches='tight')
 np.savetxt('greenfun.txt',V)
 
 # rho_inferred=-scipy.ndimage.filters.laplace(V)

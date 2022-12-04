@@ -7,37 +7,30 @@ Created on Fri Dec  2 10:50:06 2022
 
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.signal import convolve2d
+from scipy.signal import convolve
 
-gf=np.loadtxt('greenfun.txt')
-gf=np.fft.fftshift(gf)
-n=len(gf[:,0])
 
 def avg_neighbors(mat):
-    avg=1/4*(np.roll(mat,-1,0)+np.roll(mat,1,0)+np.roll(mat,-1,1)+np.roll(mat,1,1))
+    up=np.roll(mat,1,0)
+    down=np.roll(mat,-1,0)
+    right=np.roll(mat,1,1)
+    left=np.roll(mat,-1,1)
+    avg=1/4*(up+down+right+left)
     return avg
-
-class grid:
-    def __init__(self,bc,mask):
-        self.bc=bc
-        self.mask=mask
-    def rhs_bc(self):
-        rhs_bc=avg_neighbors(self.bc)
-        rhs_bc[self.mask]=0
-        return rhs_bc
-    def __matmul__(self,x):
-        x[self.mask]=0  # We only care about interior, apply mask
-        avg=avg_neighbors(x)
-        avg[self.mask]=0 # Boundaries become non-zero after avg'ing
-        return x-avg
     
-def conjgrad(A,b,xinit,niter,plot=False):
-    r=b-A@xinit
+def mat_mult(x,mask):
+    x[mask]=0  # We only care about interior, apply mask
+    avg=avg_neighbors(x)
+    avg[mask]=0  # Boundaries become non-zero after avg'ing
+    return x-avg
+
+def conjgrad(b,xinit,mask,niter,plot=False):  # CG method from class
+    r=b-mat_mult(xinit,mask)
     p=r.copy()
     rr=np.sum(r**2)
     x=xinit
     for i in range(niter):
-        Ap=A@p
+        Ap=mat_mult(p,mask)
         pAp=np.sum(p*Ap)  # Can't use @ for dot product when not vectors
         alpha=rr/pAp
         x=x+alpha*p
@@ -46,38 +39,79 @@ def conjgrad(A,b,xinit,niter,plot=False):
         beta=rr_new/rr
         p=r+beta*p
         rr=rr_new
+        b=mat_mult(x,mask) # Calculate and plot rho
         if plot:
-            plt.clf()
-            plt.imshow(x)
-            plt.colorbar()
-            plt.pause(0.1)
-    return x
-
+            if i%5==0:
+                plt.clf()
+                plt.imshow(b)
+                plt.colorbar(label='Charge density')
+                plt.title('Iteration '+str(i))
+                plt.pause(0.01)
+    return x,b
 
 n=101
-mask=np.zeros([n,n],dtype='bool')
-bc=np.zeros([n,n])
-mask[0,:]=True
+mask=np.zeros([n,n],dtype='bool') # Mask for edges and inside box
+mask[0,:]=True  
 mask[-1,:]=True
 mask[:,0]=True
 mask[:,-1]=True
 mask[2*n//5:3*n//5,2*n//5:3*n//5]=True
-bc[2*n//5:3*n//5,2*n//5:3*n//5]=1
-# bc[2*n//5,n//4:(3*n)//4]=1.0
-# bc[3*n//5,n//4:(3*n)//4]=-1.0
+bc=np.zeros([n,n])  # Potential bc's on edges of box
+bc[2*n//5,2*n//5:3*n//5]=1
+bc[3*n//5-1,2*n//5:3*n//5]=1
+bc[2*n//5:3*n//5,2*n//5]=1
+bc[2*n//5:3*n//5,3*n//5-1]=1
 
-# mask[2*n//5,n//4:(3*n)//4]=True
-# mask[3*n//5,n//4:(3*n)//4]=True
+bc_rhs=avg_neighbors(bc)  # Move boundary conditions to RHS
+bc_rhs[mask]=0  
+b=bc_rhs
+V,rho=conjgrad(b,0*b,mask,niter=n)
+V[mask]=bc[mask] # Add back BC's after zeroing with mask
 
+plt.imshow(bc+mask)
+plt.savefig('A8Q2b_bc&mask.png',bbox_inches='tight')
+plt.clf()
 
-
-
-A=grid(bc,mask)
-b=A.rhs_bc()
-x=conjgrad(A,b,0*b,niter=3*n)
-V=x.copy()
-V[A.mask]=A.bc[A.mask]
-rho=V-avg_neighbors(V)
+plt.imshow(V)
+plt.colorbar(label='Potential')
+plt.savefig('A8Q2b_Vout.png',bbox_inches='tight')
+plt.clf()
 
 plt.imshow(rho)
+plt.colorbar(label='Charge density')
+plt.savefig('A8Q2b_chargedens.png',bbox_inches='tight')
+plt.clf()
+
+plt.plot(rho[2*n//5-1,2*n//5:3*n//5])
+plt.legend(['Charge density on side'])
+plt.savefig('A8Q2b_sidechargedens')
+plt.clf()
+
+
+# Part C)
+mask=np.zeros([n,n],dtype='bool') # Mask just for edges
+mask[0,:]=True  
+mask[-1,:]=True
+mask[:,0]=True
+mask[:,-1]=True
+
+Vall=conjgrad(rho,0*rho,mask,niter=n)[0]
+plt.imshow(Vall)
+plt.colorbar(label='Potential')
+plt.savefig('A8Q2b_Vall.png',bbox_inches='tight')
+
+Ex=Vall-np.roll(Vall,-1,1)
+Ey=Vall-np.roll(Vall,-1,0)
+
+plt.clf()
+plt.quiver(Ex,Ey)
+plt.savefig('A8Q2b_Efield.png',bbox_inches='tight')
+
+Vin=Vall[2*n//5:3*n//5,2*n//5:3*n//5]
+plt.clf()
+plt.imshow(Vin)
 plt.colorbar()
+plt.savefig('A8Q2b_Vconst.png',bbox_inches='tight')
+
+# plt.imshow(np.fft.fftshift(np.fft.ifftn(np.fft.fftn(gf)*np.fft.fftn(rho))).real)
+# plt.colorbar()
